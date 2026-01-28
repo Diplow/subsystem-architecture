@@ -2,12 +2,14 @@
 """
 Exception handling for architecture checker.
 
-Handles parsing and validation of .architecture-exceptions files.
+Handles parsing and validation of .architecture-exceptions and .ruleof6-exceptions files.
 """
 
+import fnmatch
 import re
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
 
 
 class ArchitectureException:
@@ -177,12 +179,159 @@ class ExceptionHandler:
     def get_exception_info_for_reporting(self, target_path: Path) -> Optional[Dict]:
         """Get exception information for reporting purposes."""
         exception = self.get_custom_threshold(target_path)
-        
+
         if not exception:
             return None
-        
+
         return {
             "custom_threshold": exception.threshold,
             "exception_source": str(exception.source_file.relative_to(self.project_root)),
             "justification": exception.justification
+        }
+
+
+@dataclass
+class RuleOf6Exception:
+    """Represents a single Rule of 6 exception rule."""
+    file_path: str
+    function_name: Optional[str] = None
+    threshold: int = 0
+    justification: str = ""
+    source_file: str = ""
+
+
+class RuleOf6ExceptionHandler:
+    """Handles loading and applying .ruleof6-exceptions files."""
+
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+        self._file_exceptions: Dict[str, RuleOf6Exception] = {}
+        self._function_exceptions: Dict[str, RuleOf6Exception] = {}
+        self._loaded_files: List[str] = []
+
+    def load_exceptions(self, target_path: Path) -> None:
+        """Find and load all .ruleof6-exceptions files from target up to project root."""
+        current_path = target_path.resolve()
+        project_root_resolved = self.project_root.resolve()
+        max_depth = 20
+        depth = 0
+
+        while depth < max_depth:
+            exception_file = current_path / ".ruleof6-exceptions"
+            if exception_file.exists():
+                self._parse_exception_file(exception_file)
+                self._loaded_files.append(str(exception_file))
+
+            if current_path == project_root_resolved or current_path == current_path.parent:
+                break
+            current_path = current_path.parent
+            depth += 1
+
+    def _parse_exception_file(self, exception_file: Path) -> None:
+        """Parse a .ruleof6-exceptions file."""
+        try:
+            with open(exception_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"Warning: Could not read {exception_file}: {e}")
+            return
+
+        for line_num, line in enumerate(content.splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            # Extract inline justification
+            justification = ""
+            if '#' in line:
+                content_part, justification = line.split('#', 1)
+                content_part = content_part.strip()
+                justification = justification.strip()
+            else:
+                content_part = line
+                print(f"Warning: Missing justification in {exception_file}:{line_num}: {line}")
+
+            if ':' not in content_part:
+                print(f"Warning: Invalid format in {exception_file}:{line_num}: {line}")
+                continue
+
+            parts = content_part.split(':', 2)
+            if len(parts) == 3:
+                # Function exception: file:function:threshold
+                file_path_str = parts[0].strip()
+                function_name = parts[1].strip()
+                threshold_str = parts[2].strip()
+            elif len(parts) == 2:
+                # File/directory exception: path:threshold
+                file_path_str = parts[0].strip()
+                function_name = None
+                threshold_str = parts[1].strip()
+            else:
+                continue
+
+            try:
+                threshold = int(threshold_str)
+            except ValueError:
+                print(f"Warning: Invalid threshold in {exception_file}:{line_num}: {threshold_str}")
+                continue
+
+            exception = RuleOf6Exception(
+                file_path=file_path_str,
+                function_name=function_name,
+                threshold=threshold,
+                justification=justification,
+                source_file=str(exception_file),
+            )
+
+            if function_name:
+                func_key = f"{file_path_str}:{function_name}"
+                self._function_exceptions[func_key] = exception
+            else:
+                normalized_path = self._normalize_path(file_path_str)
+                self._file_exceptions[normalized_path] = exception
+
+    def _normalize_path(self, path_str: str) -> str:
+        """Normalize path for consistent matching."""
+        try:
+            if path_str.startswith('/'):
+                path = Path(path_str)
+            else:
+                path = self.project_root / path_str
+            return str(path.resolve().relative_to(self.project_root))
+        except ValueError:
+            return path_str
+
+    def get_file_exception(self, file_path: Path) -> Optional[RuleOf6Exception]:
+        """Get custom threshold for file function count."""
+        normalized = self._normalize_path(str(file_path))
+        result = self._file_exceptions.get(normalized)
+        if result:
+            return result
+        # Try with src/ prefix removed
+        if normalized.startswith('src/'):
+            return self._file_exceptions.get(normalized[4:])
+        return None
+
+    def get_function_exception(self, file_path: str, function_name: str) -> Optional[RuleOf6Exception]:
+        """Get custom threshold for a specific function."""
+        func_key = f"{file_path}:{function_name}"
+        if func_key in self._function_exceptions:
+            return self._function_exceptions[func_key]
+        # Try wildcard patterns
+        for pattern_key, rule in self._function_exceptions.items():
+            if fnmatch.fnmatch(func_key, pattern_key):
+                return rule
+        return None
+
+    def has_exceptions(self) -> bool:
+        """Check if any exceptions were loaded."""
+        return bool(self._file_exceptions or self._function_exceptions)
+
+    def get_exception_summary(self) -> Dict:
+        """Get summary of loaded exceptions for reporting."""
+        return {
+            "exception_files_loaded": self._loaded_files,
+            "file_exceptions": len(self._file_exceptions),
+            "function_exceptions": len(self._function_exceptions),
+            "total_exceptions": len(self._file_exceptions) + len(self._function_exceptions),
         }

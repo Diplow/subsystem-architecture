@@ -7,6 +7,7 @@ A framework for organizing TypeScript codebases into subsystems with enforced ar
 Subsystem Architecture turns directories into **subsystems** — self-documenting modules with explicit dependencies, public APIs via `index.ts`, and enforced import boundaries. It provides:
 
 - **Architecture checker** — validates subsystem boundaries, import rules, and documentation requirements
+- **Rule of 6 checker** — validates subsystem count, functions per file, function length, and argument count
 - **Subsystem tree** — visualizes the full subsystem hierarchy with types and lines of code
 
 Each subsystem is a directory containing a `dependencies.json` file that declares its type, allowed imports, and child subsystems.
@@ -25,12 +26,13 @@ git submodule add https://github.com/Diplow/subsystem-architecture.git scripts/c
 {
   "scripts": {
     "check:architecture": "python3 -m scripts.checks.architecture.main",
+    "check:ruleof6": "python3 -m scripts.checks.architecture.ruleof6.main",
     "subsystem-tree": "python3 -m scripts.checks.architecture.tree.main"
   }
 }
 ```
 
-Both tools are invoked as Python modules directly — no wrapper scripts needed.
+All tools are invoked as Python modules directly — no wrapper scripts needed.
 
 > **Note:** With `python3 -m`, pass args directly: `pnpm subsystem-tree -- src/lib/domains`.
 > Named flags after `--` won't work (`pnpm subsystem-tree -- --format json`).
@@ -108,6 +110,24 @@ Checklist:
 4. Add to parent's `"subsystems"` array in its `dependencies.json`
 5. Run `pnpm check:architecture` to validate
 
+#### Rule of 6
+
+The codebase follows the **Rule of 6** for consistent organization (enforced by `pnpm check:ruleof6`):
+
+- **Subsystems**: Max 6 declared child subsystems per parent. Group related children into a router subsystem.
+- **Files**: Max 6 functions per file. Move extras to other files. Prefix internal functions with `_`.
+- **Functions**: Max 50 lines (warning), 100 lines (error). Refactor into max 6 function calls at the same abstraction level.
+- **Arguments**: Max 6 arguments per function, or 1 object with max 6 keys at the same abstraction level.
+
+Custom thresholds via `.ruleof6-exceptions` files:
+```
+# Function-specific: file:function:threshold
+src/path/file.ts:complexFunction: 150  # Justification for exception
+
+# File-specific: file:threshold
+src/path/file.ts: 10  # Justification for exception
+```
+
 <!-- STOP CLAUDE.md template -->
 
 ---
@@ -140,8 +160,14 @@ The checker produces structured JSON errors. Each error has a `type` field:
 | `nonexistent_dependency` | Dependency pointing to non-existent path |
 | `reexport_boundary` | Invalid reexports in `index.ts` |
 | `file_conflict` | File/folder naming conflicts |
+| `subsystem_count` | Too many child subsystems declared (Rule of 6) |
+| `file_functions` | Too many functions per file (Rule of 6) |
+| `function_lines` | Function exceeds line limit (Rule of 6) |
+| `function_args` | Too many function arguments / object keys (Rule of 6) |
 
-Output is saved to `test-results/architecture-check.json`. Filter with `jq`:
+Architecture errors: `test-results/architecture-check.json`. Rule of 6 errors: `test-results/rule-of-6-check.json`.
+
+Filter with `jq`:
 
 ```bash
 jq '.errors[] | select(.type == "import_boundary")' test-results/architecture-check.json

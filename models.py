@@ -24,6 +24,12 @@ class ErrorType(Enum):
     DOMAIN_STRUCTURE = "domain_structure"
     DOMAIN_IMPORT = "domain_import"
 
+    # Rule of 6
+    SUBSYSTEM_COUNT = "subsystem_count"
+    FILE_FUNCTIONS = "file_functions"
+    FUNCTION_LINES = "function_lines"
+    FUNCTION_ARGS = "function_args"
+
 
 class Severity(Enum):
     """Error severity levels."""
@@ -65,6 +71,12 @@ class RecommendationType(Enum):
     RESOLVE_FILE_FOLDER_CONFLICT = "Resolve file/folder conflict"
     FIX_UPWARD_REEXPORT = "Fix upward reexport"
     FIX_REEXPORT_BOUNDARY = "Fix reexport boundary"
+
+    # Rule of 6
+    REDUCE_SUBSYSTEMS = "Reduce subsystem count"
+    REDUCE_FUNCTIONS = "Reduce function count per file"
+    REDUCE_FUNCTION_LINES = "Reduce function line count"
+    REDUCE_FUNCTION_ARGS = "Reduce function argument count"
 
     # Fallback
     OTHER = "Other"
