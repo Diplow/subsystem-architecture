@@ -1,7 +1,7 @@
 # README.md Structure Guide
 
 ## Purpose
-Each subsystem must have a README.md that serves as the single source of truth for understanding that part of the codebase. This replaces the previous dual README/ARCHITECTURE approach.
+Each subsystem must have a README.md that serves as the single source of truth for understanding that part of the codebase.
 
 ## Required Structure
 
@@ -51,12 +51,3 @@ Note: Child subsystems can import from parent freely, but all other subsystems M
 - **AI-friendly**: Well-defined interfaces help AI understand what can be used where
 - **Minimal surface area**: Less exposed = less to break when refactoring
 - **Parent-child freedom**: Children can access parent internals, but siblings must use public APIs
-
-## Migration from ARCHITECTURE.md
-
-When consolidating ARCHITECTURE.md into README.md:
-1. Extract a concrete mental model (avoid vague terms like "smart", "manager", "handler")
-2. Convert subsystem listing to non-responsibilities section
-3. Remove key concepts (they should have their own subsystems)
-4. Point dependencies section to dependencies.json only
-5. Ensure all child directories are referenced
