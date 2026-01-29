@@ -5,6 +5,7 @@ Domain-specific architecture rules.
 Handles checking domain structure and import restrictions.
 """
 
+import re
 from pathlib import Path
 from typing import List
 
@@ -24,24 +25,27 @@ class DomainRuleChecker:
         """Check domain-specific structure requirements."""
         errors = []
         # print("Checking domain structure...")
-        
+
         domains_path = self.path_helper.target_path / "lib" / "domains"
         if not domains_path.exists():
             return errors
-        
+
         for domain_dir in domains_path.iterdir():
             if not domain_dir.is_dir():
                 continue
-            
+
             # Check services structure
             errors.extend(self._check_services_structure(domain_dir))
-            
+
             # Check infrastructure structure
             errors.extend(self._check_infrastructure_structure(domain_dir))
-            
-            # Check utils structure  
+
+            # Check utils structure
             errors.extend(self._check_utils_structure(domain_dir))
-        
+
+            # Check service logging
+            errors.extend(self._check_service_logging(domain_dir))
+
         return errors
     
     def check_domain_import_restrictions(self) -> List[ArchError]:
@@ -129,6 +133,56 @@ class DomainRuleChecker:
         
         return errors
     
+    def _check_service_logging(self, domain_dir: Path) -> List[ArchError]:
+        """Check that all *Service exports from domain index.ts use withLogging."""
+        errors = []
+        index_file = domain_dir / "index.ts"
+        if not index_file.exists():
+            return errors
+
+        content = self.file_cache.get_file_info(index_file).content
+        if not content:
+            return errors
+
+        # Find all exports whose name ends with "Service"
+        # Matches: export const FooService = ..., export { FooService } from ...
+        const_exports = re.findall(r"export\s+const\s+(\w*Service)\s*=", content)
+        reexports = re.findall(r"export\s*\{[^}]*(\w*Service)[^}]*\}\s*from", content)
+
+        domain_name = domain_dir.name
+        file_path = index_file.relative_to(self.path_helper.target_path)
+
+        # const exports must use withLogging on the right-hand side
+        for service_name in const_exports:
+            # Check that the assignment calls withLogging
+            pattern = rf"export\s+const\s+{re.escape(service_name)}\s*=\s*withLogging\("
+            if not re.search(pattern, content):
+                errors.append(ArchError.create_error(
+                    message=(f"❌ Service '{service_name}' in domain '{domain_name}' "
+                             f"is exported without withLogging wrapper"),
+                    error_type=ErrorType.SERVICE_LOGGING,
+                    subsystem=str(domain_dir),
+                    file_path=str(file_path),
+                    recommendation=(f"Wrap {service_name} with withLogging in {file_path}: "
+                                    f"export const {service_name} = withLogging(\"{service_name}\", _{service_name})"),
+                    recommendation_type=RecommendationType.WRAP_SERVICE_WITH_LOGGING
+                ))
+
+        # Re-exports (export { X } from ...) bypass withLogging entirely
+        for service_name in reexports:
+            errors.append(ArchError.create_error(
+                message=(f"❌ Service '{service_name}' in domain '{domain_name}' "
+                         f"is re-exported without withLogging wrapper"),
+                error_type=ErrorType.SERVICE_LOGGING,
+                subsystem=str(domain_dir),
+                file_path=str(file_path),
+                recommendation=(f"Import {service_name} as _{service_name}, then "
+                                f"export const {service_name} = withLogging(\"{service_name}\", _{service_name})"),
+                recommendation_type=RecommendationType.WRAP_SERVICE_WITH_LOGGING
+            ))
+
+        return errors
+
     def _check_refined_service_import_violations(self, service_file: Path) -> List[ArchError]:
         """Check service imports against refined domain rules."""
         errors = []
