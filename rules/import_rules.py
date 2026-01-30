@@ -303,8 +303,8 @@ class ImportRuleChecker:
         """Find violations where external files import directly into subsystem."""
         violations = []
 
-        # Router subsystems allow direct child imports (they're just aggregators)
-        if subsystem.subsystem_type == "router":
+        # Router and API subsystems allow direct child imports (no index.ts interface)
+        if subsystem.subsystem_type in ("router", "api"):
             return violations
 
         # We want to find EXTERNAL files that import directly into this subsystem

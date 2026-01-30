@@ -102,7 +102,7 @@ class SubsystemInfo:
     files: List[FileInfo] = field(default_factory=list)
     total_lines: int = 0
     parent_path: Optional[Path] = None
-    subsystem_type: Optional[str] = None  # "boundary", "router", "domain", or "utility"
+    subsystem_type: Optional[str] = None  # "boundary", "router", "domain", "utility", "page", "app", or "api"
 
 
 @dataclass
