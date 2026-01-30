@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 
 from .models import CheckResults, SubsystemInfo, FileInfo
-from .rules import ComplexityRuleChecker, SubsystemRuleChecker, ImportRuleChecker, DomainRuleChecker, AppPageRuleChecker
+from .rules import ComplexityRuleChecker, SubsystemRuleChecker, ImportRuleChecker, DomainRuleChecker, AppPageRuleChecker, ApiRuleChecker
 from .utils import FileCache, PathHelper, ExceptionHandler
 from .utils.file_utils import find_typescript_files
 
@@ -34,6 +34,7 @@ class ArchitectureChecker:
         self.import_checker = ImportRuleChecker(self.path_helper, self.file_cache)
         self.domain_checker = DomainRuleChecker(self.path_helper, self.file_cache)
         self.app_page_checker = AppPageRuleChecker(self.path_helper, self.file_cache)
+        self.api_checker = ApiRuleChecker(self.path_helper, self.file_cache)
         
         # Track subsystems for cross-rule coordination
         self.subsystems: List[SubsystemInfo] = []
@@ -58,6 +59,7 @@ class ArchitectureChecker:
         self._run_standalone_index_checks(results)
         self._run_domain_checks(results)
         self._run_app_page_checks(results)
+        self._run_api_checks(results)
 
         results.execution_time = time.time() - start_time
         return results
@@ -241,6 +243,12 @@ class ArchitectureChecker:
 
         # Check domain import restrictions
         errors = self.domain_checker.check_domain_import_restrictions()
+        for error in errors:
+            results.add_error(error)
+
+    def _run_api_checks(self, results: CheckResults) -> None:
+        """Run API route logging checks."""
+        errors = self.api_checker.check_api_route_logging(self.subsystems)
         for error in errors:
             results.add_error(error)
 

@@ -24,6 +24,7 @@ class ErrorType(Enum):
     DOMAIN_STRUCTURE = "domain_structure"
     DOMAIN_IMPORT = "domain_import"
     SERVICE_LOGGING = "service_logging"
+    API_ROUTE_LOGGING = "api_route_logging"
 
     # Rule of 6
     SUBSYSTEM_COUNT = "subsystem_count"
@@ -68,6 +69,7 @@ class RecommendationType(Enum):
     MOVE_SERVICE_TO_API = "Move service to API layer"
     FIX_DOMAIN_SERVICE_IMPORT = "Fix domain service import"
     WRAP_SERVICE_WITH_LOGGING = "Wrap service export with withLogging"
+    WRAP_API_WITH_LOGGING = "Wrap API route with withApiLogging"
 
     # Structural
     RESOLVE_FILE_FOLDER_CONFLICT = "Resolve file/folder conflict"
