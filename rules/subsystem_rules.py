@@ -304,6 +304,61 @@ class SubsystemRuleChecker:
         
         return errors
     
+    def check_unused_dependencies(self, subsystems: List[SubsystemInfo]) -> List[ArchError]:
+        """Check for declared dependencies that are never imported by any file in the subsystem."""
+        errors = []
+
+        for subsystem in subsystems:
+            deps = subsystem.dependencies
+            allowed = deps.get("allowed", [])
+
+            if not allowed:
+                continue
+
+            # Collect all imports from all files in this subsystem
+            all_imports: Set[str] = set()
+            for file_info in subsystem.files:
+                for import_path in file_info.imports:
+                    all_imports.add(import_path)
+
+            # Check each declared dependency against actual imports
+            for dep in allowed:
+                if self._is_dependency_used(dep, all_imports, subsystem):
+                    continue
+
+                error = ArchError.create_error(
+                    message=(f"❌ Unused dependency in {subsystem.name}:\n"
+                           f"  🔸 '{dep}' is declared in 'allowed' but never imported\n"
+                           f"     → Remove '{dep}' from {subsystem.path}/dependencies.json 'allowed' array"),
+                    error_type=ErrorType.UNUSED_DEPENDENCY,
+                    subsystem=str(subsystem.path),
+                    recommendation=f"Remove '{dep}' from {subsystem.path}/dependencies.json 'allowed' array (never imported)",
+                    recommendation_type=RecommendationType.REMOVE_UNUSED_DEPENDENCY
+                )
+                errors.append(error)
+
+        return errors
+
+    def _is_dependency_used(self, dep: str, all_imports: Set[str], subsystem: SubsystemInfo) -> bool:
+        """Check if a declared dependency is actually used by any import in the subsystem."""
+        dep_normalized = dep.rstrip('/')
+
+        for import_path in all_imports:
+            # Direct match: import exactly equals the declared dependency
+            if import_path == dep_normalized:
+                return True
+
+            # Hierarchical match: import is a sub-path of the declared dependency
+            # e.g., dep="~/lib/domains/conversation" matches import "~/lib/domains/conversation/types"
+            if import_path.startswith(f"{dep_normalized}/"):
+                return True
+
+            # Reverse hierarchical: declared dep is more specific than the import
+            # e.g., dep="~/lib/utils/helpers" is used if there's an import "~/lib/utils/helpers"
+            # (already covered by direct match above)
+
+        return False
+
     def check_file_folder_conflicts(self) -> List[ArchError]:
         """Check for file/folder naming conflicts."""
         errors = []

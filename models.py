@@ -20,6 +20,7 @@ class ErrorType(Enum):
     DEPENDENCY_FORMAT = "dependency_format"
     REDUNDANCY = "redundancy"
     NONEXISTENT_DEPENDENCY = "nonexistent_dependency"
+    UNUSED_DEPENDENCY = "unused_dependency"
     FILE_CONFLICT = "file_conflict"
     DOMAIN_STRUCTURE = "domain_structure"
     DOMAIN_IMPORT = "domain_import"
@@ -49,6 +50,7 @@ class RecommendationType(Enum):
     ADD_ALLOWED_DEPENDENCY = "Add to allowed dependencies"
     ADD_ALLOWED_CHILDREN = "Add to allowedChildren"
     REMOVE_REDUNDANT_DEPENDENCY = "Remove redundant dependency"
+    REMOVE_UNUSED_DEPENDENCY = "Remove unused dependency"
     REMOVE_FORBIDDEN_DEPENDENCY = "Remove forbidden dependency"
     FIX_DEPENDENCY_PATH_FORMAT = "Fix dependency path format"
 

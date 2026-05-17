@@ -195,7 +195,12 @@ class ArchitectureChecker:
         errors = self.subsystem_checker.check_nonexistent_dependencies(self.subsystems)
         for error in errors:
             results.add_error(error)
-        
+
+        # Check for unused dependencies
+        errors = self.subsystem_checker.check_unused_dependencies(self.subsystems)
+        for error in errors:
+            results.add_error(error)
+
         # Check file/folder conflicts
         errors = self.subsystem_checker.check_file_folder_conflicts()
         for error in errors:
